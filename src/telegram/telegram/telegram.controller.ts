@@ -49,7 +49,7 @@ export class TelegramController {
     if (body.ticket_id) {
       await Promise.all(
         this.CHAT_IDS.map((i) =>
-          this.sendTelegramMessage(i, `Вы сказали: ${body.last_response}`),
+          this.sendTelegramMessage(i, `Paycord reply: ${body.last_response}`),
         ),
       );
 
@@ -70,7 +70,7 @@ export class TelegramController {
         this.zendeskService.sendFileToZendesk(body.message, ticketId);
       }
       // Отправляем ответ пользователю
-      await this.sendTelegramMessage(chatId, `Вы сказали: ${message}`);
+      await this.sendTelegramMessage(chatId, `New ticket create: ${ticketId}`);
     }
 
     return 'OK'; // Telegram ожидает подтверждение
