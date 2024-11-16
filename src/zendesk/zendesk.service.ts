@@ -1,21 +1,80 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios'; // Импортируем HttpService из пакета @nestjs/axios
-import * as FormData from 'form-data'; // Для работы с формой и загрузкой файлов
+import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as path from 'path';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '@/config';
 
 @Injectable()
 export class ZendeskService {
-  private readonly logger = new Logger(ZendeskService.name);
+  constructor(private readonly config: ConfigService<Config>) {}
 
-  private readonly ZENDESK_API_TOKEN =
-    'isBEKmcJw4lAdXuMp4sAqjgQI4TFNTWnmlM41q0h'; // API токен для Zendesk
-  private readonly ZENDESK_DOMAIN = 'paycordsupport'; // Домен Zendesk
-  private readonly ZENDESK_EMAIL = 'akhmed.a@paycord.com'; // Ваш email для Zendesk
-  private readonly TELEGRAM_TOKEN =
-    '7221468289:AAFDq65rV554TsvtQnWqMpSKXjLjow9HZa8'; // Токен Telegram
+  private async getFileBuffer(fileUrl: string): Promise<Buffer> {
+    try {
+      const response = await axios.get(fileUrl, {
+        responseType: 'arraybuffer',
+      });
+      return response.data;
+    } catch (error) {
+      console.log('Ошибка при скачивании файла:', error.message);
+      throw new Error('Ошибка при скачивании файла');
+    }
+  }
 
-  constructor(private readonly httpService: HttpService) {}
+  private getMimeType(fileName: string): string {
+    const ext = path.extname(fileName).toLowerCase();
+    console.log(`Detected extension: ${ext}`);
+
+    switch (ext) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  async createZendeskTicket(text: string, title: string): Promise<number> {
+    const url = `https://${this.config.get('ZENDESK_DOMAIN')}.zendesk.com/api/v2/tickets.json`;
+
+    const payload = {
+      ticket: {
+        subject: title,
+        description: text,
+        priority: 'normal',
+      },
+    };
+
+    // Заголовки для авторизации
+    const headers = {
+      Authorization: `Basic ${Buffer.from(
+        `${this.config.get('ZENDESK_EMAIL')}/token:${this.config.get('ZENDESK_API_TOKEN')}`,
+      ).toString('base64')}`,
+      'Content-Type': 'application/json',
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers });
+
+      // Получаем ID тикета из ответа
+      const ticketId = response.data.ticket.id;
+      console.log(`Ticket created successfully with ID: ${ticketId}`);
+      return ticketId;
+    } catch (error) {
+      //   console.error(
+      //     `Ошибка при создании тикета в Zendesk: ${error.response?.data?.description || error.message}`,
+      //   );
+      console.log(
+        `Ошибка при создании тикета в Zendesk: ${error.response?.data?.description || error.message}`,
+      );
+      throw new Error('Ошибка при создании тикета в Zendesk');
+    }
+  }
 
   // Функция для загрузки файла в Zendesk и прикрепления его к тикету
   async sendFileToZendesk(file: any, ticketId: number): Promise<void> {
@@ -43,7 +102,7 @@ export class ZendeskService {
 
     console.log('fileContainer', fileContainer);
 
-    const fileLinkUrl = `https://api.telegram.org/bot${this.TELEGRAM_TOKEN}/getFile?file_id=${fileContainer.url}`;
+    const fileLinkUrl = `https://api.telegram.org/bot${this.config.get('TELEGRAM_TOKEN')}/getFile?file_id=${fileContainer.url}`;
 
     try {
       // Получаем информацию о файле
@@ -51,7 +110,7 @@ export class ZendeskService {
       const filePath = fileLinkResponse.data.result.file_path;
       console.log('filePath', filePath);
 
-      const fileDownloadUrl = `https://api.telegram.org/file/bot${this.TELEGRAM_TOKEN}/${filePath}`;
+      const fileDownloadUrl = `https://api.telegram.org/file/bot${this.config.get('TELEGRAM_TOKEN')}/${filePath}`;
       const fileBuffer = await this.getFileBuffer(fileDownloadUrl);
 
       // Определяем MIME тип
@@ -64,7 +123,7 @@ export class ZendeskService {
         URL.createObjectURL(new Blob([fileBuffer])),
       );
       const fileBlob = await localFile.blob(); // Создаем blob
-      const uploadUrl = `https://${this.ZENDESK_DOMAIN}.zendesk.com/api/v2/uploads.json?filename=${fileContainer.fileName}`;
+      const uploadUrl = `https://${this.config.get('ZENDESK_DOMAIN')}.zendesk.com/api/v2/uploads.json?filename=${fileContainer.fileName}`;
 
       // Отправляем файл через axios с использованием blob
       const uploadResponse = await axios({
@@ -73,7 +132,7 @@ export class ZendeskService {
         data: fileBlob,
         headers: {
           'Content-Type': 'application/octet-stream',
-          Authorization: `Basic ${Buffer.from(`${this.ZENDESK_EMAIL}/token:${this.ZENDESK_API_TOKEN}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`${this.config.get('ZENDESK_EMAIL')}/token:${this.config.get('ZENDESK_API_TOKEN')}`).toString('base64')}`,
         },
       });
 
@@ -90,7 +149,7 @@ export class ZendeskService {
       const attachPayload = {
         ticket: {
           comment: {
-            body: 'Файл прикреплен',
+            body: 'Attachment posted',
             uploads: [attachmentToken],
           },
         },
@@ -98,11 +157,11 @@ export class ZendeskService {
 
       // Прикрепляем файл к тикету в Zendesk
       const attachResponse = await axios.put(
-        `https://${this.ZENDESK_DOMAIN}.zendesk.com/api/v2/tickets/${ticketId}.json`,
+        `https://${this.config.get('ZENDESK_DOMAIN')}.zendesk.com/api/v2/tickets/${ticketId}.json`,
         attachPayload,
         {
           headers: {
-            Authorization: `Basic ${Buffer.from(`${this.ZENDESK_EMAIL}/token:${this.ZENDESK_API_TOKEN}`).toString('base64')}`,
+            Authorization: `Basic ${Buffer.from(`${this.config.get('ZENDESK_EMAIL')}/token:${this.config.get('ZENDESK_API_TOKEN')}`).toString('base64')}`,
             'Content-Type': 'application/json',
           },
         },
@@ -117,39 +176,6 @@ export class ZendeskService {
         error.response?.data || error.message,
       );
       throw new Error('Ошибка при отправке файла в Zendesk');
-    }
-  }
-
-  // Функция для скачивания файла
-  private async getFileBuffer(fileUrl: string): Promise<Buffer> {
-    try {
-      const response = await axios.get(fileUrl, {
-        responseType: 'arraybuffer',
-      });
-      return response.data;
-    } catch (error) {
-      console.log('Ошибка при скачивании файла:', error.message);
-      throw new Error('Ошибка при скачивании файла');
-    }
-  }
-
-  // Функция для получения MIME типа на основе расширения файла
-  private getMimeType(fileName: string): string {
-    const ext = path.extname(fileName).toLowerCase();
-    console.log(`Detected extension: ${ext}`);
-
-    switch (ext) {
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      case '.gif':
-        return 'image/gif';
-      case '.pdf':
-        return 'application/pdf';
-      default:
-        return 'application/octet-stream'; // Для всех других типов
     }
   }
 }

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  getHello(): string {
+  constructor() {}
+  async getHello() {
     return 'Zendesk server bot is working fine.';
   }
 }
