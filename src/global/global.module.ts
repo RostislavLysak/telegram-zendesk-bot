@@ -1,13 +1,13 @@
 import { Global, Module } from '@nestjs/common';
-import { DatabaseModule } from '@/database/database.module';
+// import { DatabaseModule } from '../database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
-import config from '@/config';
+import config from '../config';
 
 @Global()
 @Module({
   imports: [
-    DatabaseModule,
+    // DatabaseModule,
     HttpModule,
     ConfigModule.forRoot({
       ignoreEnvFile: true,
@@ -15,6 +15,6 @@ import config from '@/config';
       load: [config],
     }),
   ],
-  exports: [DatabaseModule, HttpModule],
+  exports: [HttpModule],
 })
 export class GlobalModule {}

@@ -1,6 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 
-import { TelegramService } from '@/telegram/telegram.service';
+import { TelegramService } from './telegram.service';
 
 @Controller('api/telegram')
 export class TelegramController {

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ZendeskService } from '@/zendesk/zendesk.service';
+import { ZendeskService } from './zendesk.service';
 
 @Module({
   providers: [ZendeskService],

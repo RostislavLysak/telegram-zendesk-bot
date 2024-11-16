@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '@/config';
+import { Config } from '../config';
 
 @Injectable()
 export class ZendeskService {
