@@ -103,10 +103,10 @@ export class TelegramService {
     //   }
     // }
     // Обработка обычного текстового сообщения
-    if (message.text || message.caption) {
-      const textMessage = message.text || message.caption;
+    if (message?.text || message?.caption) {
+      const textMessage = message?.text || message?.caption;
       const chatId = message.chat.id;
-      const title = message.chat.title;
+      const title = message.chat?.title;
       console.log(chatId, textMessage, title);
 
       const ticketId = await this.zendeskService.createZendeskTicket(
@@ -124,7 +124,7 @@ export class TelegramService {
         //   },
         // });
 
-        if (message.document || message.photo) {
+        if (message?.document || message?.photo) {
           await this.zendeskService.sendFileToZendesk(message, ticketId);
         }
 
